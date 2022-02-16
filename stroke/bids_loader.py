@@ -44,17 +44,15 @@ class BIDSLoader:
 
     def __init__(
         self,
-        root_dir: str,
         data_entities: list,
         target_entities: list,
+        root_dir: str = None,
         batch_size: int = 1,
         data_derivatives_names: list = None,
         target_derivatives_names: list = None,
         root_list: list = None,
         label_names: list = None,
     ):
-
-        self.root_dir = root_dir
 
         if isinstance(data_entities, list):
             self.data_entities = data_entities
@@ -72,6 +70,23 @@ class BIDSLoader:
         else:
             raise (TypeError("target_entities should be a list of dicts"))
 
+        self.num_data = len(self.data_entities)
+        self.num_target = len(self.target_entities)
+
+        if(root_dir is None and root_list is None):
+            raise(ValueError('Either root_dir or root_list must be defined.'))
+        elif(root_dir is None):
+            assert len(root_list) == self.num_data + self.num_target, \
+                "Root list should match the number of data + targets"
+            self.root_data = root_list[:self.num_data]
+            self.root_target = root_list[self.num_data:]
+        elif(root_list is None):
+            # Need to make list of length num_data + num_target
+            self.root_data = [root_dir for _ in range(self.num_data)]
+            self.root_target= [root_dir for _ in range(self.num_target)]
+        else:
+            raise(ValueError('Both root_dir and root_list are defined; only one of these should be used.'))
+
         self.batch_size = batch_size
 
         # Deal with data + derivatives
@@ -79,15 +94,17 @@ class BIDSLoader:
             self.data_derivatives_names = [None for _ in self.data_entities]
         else:
             self.data_derivatives_names = data_derivatives_names
+
+        # Get derivative set if derivatives; get raw if not
         self.data_bids = []
-        default_data = bids.BIDSLayout(root=root_dir)
-        for name in self.data_derivatives_names:
-            if name is None:
-                self.data_bids.append(default_data)
-            else:
-                self.data_bids.append(
-                    bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
-                )
+        for bids_root in self.root_data:
+            for name in self.data_derivatives_names:
+                if name is None:
+                    self.data_bids.append(bids.BIDSLayout(root=bids_root))
+                else:
+                    self.data_bids.append(
+                        bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
+                    )
         self.data_is_derivatives = [s is not None for s in self.data_derivatives_names]
 
         # Deal with target + derivatives
@@ -98,13 +115,14 @@ class BIDSLoader:
         else:
             self.target_derivatives_names = target_derivatives_names
         self.target_bids = []
-        for name in self.target_derivatives_names:
-            if name is None:
-                self.target_bids.append(default_data)
-            else:
-                self.target_bids.append(
-                    bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
-                )
+        for bids_root in self.root_target:
+            for name in self.target_derivatives_names:
+                if name is None:
+                    self.target_bids.append(bids.BIDSLayout(root=bids_root))
+                else:
+                    self.target_bids.append(
+                        bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
+                    )
         self.target_is_derivatives = [
             s is not None for s in self.target_derivatives_names
         ]
@@ -116,13 +134,6 @@ class BIDSLoader:
             self.data_shape = self.data_list[0][0].get_image().shape
         if len(self.target_list) > 0:
             self.target_shape = self.target_list[0][0].get_image().shape
-
-        if root_list is not None:
-            raise (
-                NotImplementedError(
-                    "Processing root list has not yet been implemented."
-                )
-            )
 
         self.label_names = label_names
         self._prediction_label_names = self.label_names  # RAMP convention
@@ -158,7 +169,7 @@ class BIDSLoader:
         self.data_list = []
         self.target_list = []
         bids_set = bids.BIDSLayout(
-            root=self.root_dir, derivatives=self.data_is_derivatives[0]
+            root=self.root_data[0], derivatives=self.data_is_derivatives[0]
         )
         if self.data_is_derivatives[0]:
             bids_set = bids_set.derivatives[self.data_derivatives_names[0]]
@@ -181,6 +192,7 @@ class BIDSLoader:
                         f"Image matching returned more than one match for data; make either required_entities or "
                         f"matching_entities to be more specific. {im}"
                     )
+                    sample_list.append(new_sample[0])
                 elif len(new_sample) == 0:
                     self.unmatched_image_list.append(im)
                     warnings.warn(f"No match found for image {im}")
@@ -202,6 +214,7 @@ class BIDSLoader:
                         "Image matching returned more than one match for target; either make "
                         f"required_entities or matching_entities more specific. (image: {im})"
                     )
+                    sample_list.append(new_sample[0])
                 elif len(new_sample) == 0:
                     self.unmatched_target_list.append(im)
                     warnings.warn(f"No match found for image {im}")
@@ -267,6 +280,38 @@ class BIDSLoader:
                 if potential_im != image_to_match:
                     potential_idx.append(idx)
         return [potential_matches[i] for i in potential_idx]
+
+    @staticmethod
+    def check_image_match(im1: BIDSImageFile,
+                          im2: BIDSImageFile,
+                          matching_ents: list) -> bool:
+        '''
+        Checks that the two input images are a match according to matching_ents. If at least one image does not have an
+        entity (i.e., it is not defined for that image), it is assumed to match.
+        Parameters
+        ----------
+        im1 : BIDSImageFile
+            The first image to check.
+        im2 : BIDSImageFile
+            The second image to check.
+        matching_ents : list
+            The list of entities that must match.
+        Returns
+        -------
+        bool
+            Whether the two images match.
+        '''
+        im1_ents = im1.entities
+        im2_ents = im2.entities
+        for ent in matching_ents:
+            if(ent in im1_ents and ent in im2_ents):
+                if(im1_ents[ent] == im2_ents[ent]):
+                    continue
+                else:
+                    return False  # Found non-match; return False
+        else:
+            return True  # Didn't exit after checking all ents; everything must match
+
 
     @staticmethod
     def _get_empty_entities(ents: dict):

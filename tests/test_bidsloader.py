@@ -39,7 +39,7 @@ class TestBIDSLoader(unittest.TestCase):
             target_entities=target_ent,
             batch_size=batch_size,
         )
-        self.assertEqual(bdc.root_dir, root_dir)
+        self.assertEqual(bdc.root_data[0], root_dir)
         self.assertEqual(bdc.data_entities, data_ent)
         self.assertEqual(bdc.target_entities, target_ent)
         self.assertEqual(bdc.batch_size, batch_size)
@@ -120,6 +120,22 @@ class TestBIDSLoader(unittest.TestCase):
         )
         self.assertTrue(bdc.target_is_derivatives[1])
         self.assertFalse(bdc.target_is_derivatives[0])
+        return
+
+    def test_BIDSLoader_multiroot(self):
+        '''Tests supplying multiple root directories'''
+        test_dir = os.path.dirname(__file__)
+        root_data = os.path.join(test_dir, "bids_sample/train")
+        root_target = os.path.join(test_dir, "bids_sample/test")
+        data_ent = {"suffix": "T1w", "subject": "", "session": ""}
+        target_ent = {"suffix": "FLAIR"}
+
+        bdc = BIDSLoader(root_list=[root_data, root_target],
+                         data_entities=data_ent,
+                         target_entities=target_ent)
+        match_ents = ['subject','session']
+        for data, target in zip(bdc.data_list, bdc.target_list):
+            self.assertTrue(BIDSLoader.check_image_match(data[0], target[0], matching_ents=match_ents))
         return
 
     def test_getemptyentities_emptydict(self):
