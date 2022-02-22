@@ -13,8 +13,6 @@ class BIDSLoader:
     BIDS-compatible data loader used for classifying BIDS datasets.
     Parameters
     ----------
-    root_dir : str
-        BIDS root directory; subject directories should be immediately below this (e.g. root_dir/sub-123)
     data_entities : list [dict]
         List of dictionaries, where each dictionary contains BIDS entities that will uniquely match data. Multiple
         dictionaries should be used to if multiple files will be used for prediction.
@@ -26,6 +24,9 @@ class BIDSLoader:
         description entitiy is used to differentiate between them.
     target_entities : list [dict]
         Same as data_entities, but for the prediction target.
+    root_dir : str
+        Optional. BIDS root directory; subject directories should be immediately below this (e.g. root_dir/sub-123).
+        Either root_dir or root_list must be defined.
     batch_size : int
         Optional. Size of the batch to train the estimator. Default: 1.
     data_derivatives_names : list [str]
@@ -35,7 +36,7 @@ class BIDSLoader:
         Optional. If an entry in target_entities is BIDS derivatives data, its name should be listed here. Entries
         that don't correspond to derivatives should be listed as None. Default: [None for _ in target_entities]
     root_list : list
-        Reserved. Not yet implemented. List of BIDS root directories, if data must be loaded from different BIDS
+        List of BIDS root directories, if data must be loaded from different BIDS
         directories. There must be exactly len(data_entities) + len(target_entities) entries in the list, with the
         order corresponding to the order of the data_entities, followed by the target_entities.
     label_names : list [str]
