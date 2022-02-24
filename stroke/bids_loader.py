@@ -104,7 +104,7 @@ class BIDSLoader:
                     self.data_bids.append(bids.BIDSLayout(root=bids_root))
                 else:
                     self.data_bids.append(
-                        bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
+                        bids.BIDSLayout(root=bids_root, derivatives=True).derivatives[name]
                     )
         self.data_is_derivatives = [s is not None for s in self.data_derivatives_names]
 
@@ -122,7 +122,7 @@ class BIDSLoader:
                     self.target_bids.append(bids.BIDSLayout(root=bids_root))
                 else:
                     self.target_bids.append(
-                        bids.BIDSLayout(root=root_dir, derivatives=True).derivatives[name]
+                        bids.BIDSLayout(root=bids_root, derivatives=True).derivatives[name]
                     )
         self.target_is_derivatives = [
             s is not None for s in self.target_derivatives_names
@@ -437,6 +437,20 @@ class BIDSLoader:
             target[point_idx, ...] = point.get_image().get_fdata()
         return data, target
 
+    def load_samples(self):
+        '''
+        Generator that yields one sample at a time.
+        Returns
+        -------
+        np.array
+            Array of shape (num_data, *image.shape) containing the data.
+        np.array
+            Array of shape (num_target, *image.shape) containing the target.
+        '''
+        for i in range(len(self)):
+            yield self.load_sample(i)
+        return
+
     def __len__(self):
         return len(self.data_list)
 
@@ -465,3 +479,19 @@ class BIDSLoader:
         for i, idx in enumerate(indices):
             data[i, ...], target[i, ...] = self.load_sample(idx)
         return data, target
+
+    def load_batches(self):
+        '''
+        Generator that yields one batch at a time. Returns incomplete batch if dataset size is not evenly divisible by
+        the number of batches.
+
+        Returns
+        -------
+        np.array
+            Array of shape (batch_size, num_data, *image.shape) containing data.
+        np.array
+            Array of shape (batch_size, num_target, *image.shape) containing data.
+        '''
+        for i in range(0, len(self), self.batch_size):
+            yield self.load_batch(range(i, i+self.batch_size))
+        return
