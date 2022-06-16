@@ -10,7 +10,7 @@ import tarfile
 
 
 data = {
-    "encrypted_hash": "b9cdf26486e7dd325d5d6617f2218204bbaa0b649dbca03e729a41a449bef671",
+    "encrypted_hash": "cdc49851e613815638e313494ba06914c6f706d0035fb7c51b6bf0e3c29136af",
     "url": "ftp://www.nitrc.org/fcon_1000/htdocs/indi/retro/ATLAS/releases/R2.0/ATLAS_R2.0_encrypted.tar.gz",
     "private_osf_ids": ["2rvym", "3t8jg", "nkr2e"],
 }
